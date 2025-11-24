@@ -1,3 +1,6 @@
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+
+
 /**
  * =========================================================
  * Lab: SECURE WEATHER DASHBOARD
@@ -255,14 +258,67 @@ app.get("/", (_req, res) => {
 // POST /register
 // =========================
 app.post("/register", async (req, res) => {
-  // Implement logic here based on the TODO 1.
+  try {
+    const { email, password } = req.body || {};
+
+    // 1) Validate input
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    // 2) Check if user exists
+    const existing = users.find((u) => u.email === email);
+    if (existing) {
+      return res.status(400).json({ error: "User already exists" });
+    }
+
+    // 3) Hash password
+    const hash = await bcrypt.hash(password, 10);
+
+    // 4) Store user
+    users.push({ email, passwordHash: hash });
+
+    // 5) Respond
+    return res.status(201).json({ message: "User registered!" });
+  } catch (err) {
+    console.error("Register error:", err);
+    return res.status(500).json({ error: "Server error during register" });
+  }
 });
+
 
 // =========================
 // POST /login
 // =========================
 app.post("/login", async (req, res) => {
-  // Implement logic here based on the TODO 2.
+  try {
+    const { email, password } = req.body || {};
+
+    // 1) Validate input
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    // 2) Find user
+    const user = users.find((u) => u.email === email);
+    if (!user) {
+      return res.status(400).json({ error: "User not found" });
+    }
+
+    // 3) Compare password
+    const match = await bcrypt.compare(password, user.passwordHash);
+    if (!match) {
+      return res.status(400).json({ error: "Wrong password" });
+    }
+
+    // 4) Generate token
+    const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: "1h" });
+
+    return res.json({ token });
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).json({ error: "Server error during login" });
+  }
 });
 
 // =========================
@@ -270,8 +326,53 @@ app.post("/login", async (req, res) => {
 // GET /weather?city=Riyadh
 // =========================
 app.get("/weather", async (req, res) => {
-  // Implement logic here based on the TODO 3.
+  try {
+    // 1) Read token
+    const auth = req.headers.authorization;
+    if (!auth) {
+      return res.status(401).json({ error: "Missing token" });
+    }
+
+    const token = auth.split(" ")[1];
+
+    // 2) Verify token
+    try {
+      jwt.verify(token, JWT_SECRET);
+    } catch {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    // 3) Read city
+    const city = req.query.city;
+    if (!city) {
+      return res.status(400).json({ error: "City required" });
+    }
+
+    // 4) Fetch weather
+    const url = `https://goweather.herokuapp.com/weather/${encodeURIComponent(city)}`;
+    const weatherResponse = await fetch(url);
+
+    if (!weatherResponse.ok) {
+      return res.status(500).json({ error: "Error from weather API" });
+    }
+
+    const data = await weatherResponse.json();
+
+    // 5) Send response
+    return res.json({
+      city,
+      temp: data.temperature,
+      description: data.description,
+      wind: data.wind,
+      raw: data,
+    });
+
+  } catch (err) {
+    console.error("Weather error:", err);
+    return res.status(500).json({ error: "Server error during weather fetch" });
+  }
 });
+
 
 // Start server
 app.listen(PORT, () =>

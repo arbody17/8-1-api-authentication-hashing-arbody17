@@ -1,10 +1,10 @@
 {
-  "name": "8-1-Thirdparty-API-Authentication-Password-Hasing",
+  "name": "Lab-2-2-more-html",
   "version": "1.0.0",
-  "description": "Simple lab: password hashing, JWT auth, third-party weather API",
-  "main": "server.js",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "grade": "node script.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
